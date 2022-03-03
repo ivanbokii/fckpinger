@@ -1,17 +1,32 @@
 const puppeteer = require('puppeteer');
+const path = require('path');
+const moment = require('moment');
 
-async function runSingle(browser, url, defaultTimeout=7000) {
+async function runSingle(browser, targetUrl, defaultTimeout=7000) {
+  const timestamp = moment.utc().toString();
   const page = await browser.newPage();
   page.setDefaultTimeout(defaultTimeout);
 
-  try {
-    console.log(`requesting ${url}`);
-    await page.goto(url);
-  } catch(e) {
-    console.log(`FOUND ERROR -> ${url}`);
-  }
+  return new Promise(async (resolve, reject) => {
+    try {
+      await page.goto(targetUrl);
 
-  page.on("load", () => console.log(`${url} loaded OK`));
+      const url = new URL(targetUrl);
+      const screenshotPath = path.resolve(__dirname, `public/screenshots/${url.hostname}.png`);
+
+      console.log("------------------> ");
+      console.log(screenshotPath);
+      await page.screenshot({ path: screenshotPath });
+
+      resolve({ type: "ok", targetUrl, timestamp });
+    } catch(e) {
+      if (e instanceof puppeteer.errors.TimeoutError) {
+        return resolve({ type: "timeout", targetUrl, timestamp });
+      }
+
+      return resolve({ type: "failed", targetUrl, error: e, timestamp });
+    }
+  });
 }
 
 module.exports = runSingle;
